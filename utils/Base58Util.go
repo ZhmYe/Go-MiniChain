@@ -35,7 +35,11 @@ func (b *Base58Util) Encode(input []byte) string {
 	encoded := make([]byte, len(input)*2)
 	outputStart := len(encoded)
 	// Base58编码正式开始
-	for inputStart := nbZero; inputStart < len(input); {
+	inputStart := nbZero
+	for {
+		if inputStart >= len(input) {
+			break
+		}
 		outputStart--
 		encoded[outputStart] = b.ALPHABET[b.divmod(input, inputStart, 256, 58)]
 		if (input[inputStart]) == 0 {
@@ -62,5 +66,47 @@ func (b *Base58Util) Encode(input []byte) string {
 	return string(encoded[outputStart:])
 }
 func (b *Base58Util) Decode(input string) []byte {
+	if len(input) == 0 {
+		return make([]byte, 0)
+	}
+	// 将BASE58编码的ASCII字符转换为BASE58字节序列
+	input58 := make([]byte, len(input))
+	for i := 0; i < len(input); i++ {
+		char := input[i]
+		input58[i] = char
+	}
+	// 统计前导0
+	nbZero := 0
+	for {
+		if nbZero < len(input58) && input58[nbZero] == 0 {
+			nbZero++
+		} else {
+			break
+		}
+	}
+	// Base58 编码转 字节序（256进制）编码
+	decoded := make([]byte, len(input))
+	outputStart := len(decoded)
+	inputStart := nbZero
+	for {
+		if inputStart >= len(input58) {
+			break
+		}
+		outputStart--
+		decoded[outputStart] = b.divmod(input58, inputStart, 58, 256)
+		if input58[inputStart] == 0 {
+			inputStart++
+		}
+	}
+	for {
+		if outputStart < len(decoded) && decoded[outputStart] == 0 {
+			outputStart++
+		} else {
+			break
+		}
+	}
+	return decoded[outputStart-nbZero:]
+}
+func (b *Base58Util) divmod(number []byte, firstDigest int, base int, divisor int) byte {
 
 }
