@@ -10,6 +10,8 @@ package config
 type Config struct {
 	difficulty          int
 	maxTransactionCount int
+	nbAccount           int
+	initAmout           int
 }
 
 func (c *Config) GetDifficulty() int {
@@ -18,8 +20,16 @@ func (c *Config) GetDifficulty() int {
 func (c *Config) GetMaxTransactionCount() int {
 	return c.maxTransactionCount
 }
+func (c *Config) GetAccountNumber() int {
+	return c.nbAccount
+}
+func (c *Config) GetInitAmount() int {
+	return c.initAmout
+}
 
 var MiniChainConfig = Config{
-	difficulty:          4,
+	difficulty:          2,
 	maxTransactionCount: 64,
+	nbAccount:           100,
+	initAmout:           10000,
 }

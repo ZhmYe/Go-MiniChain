@@ -13,7 +13,7 @@ type NetWork struct {
 
 func NewNetWork() *NetWork {
 	blockchain := data.NewBlockChain()
-	miner := consensus.NewMinerNode(data.NewTransactionPool(config.MiniChainConfig.GetMaxTransactionCount()), blockchain)
+	miner := consensus.NewMinerNode(data.NewTransactionPool(config.MiniChainConfig.GetMaxTransactionCount(), blockchain), blockchain)
 	return &NetWork{
 		blockchain: *blockchain,
 		miner:      *miner,

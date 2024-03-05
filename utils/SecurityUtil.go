@@ -3,7 +3,6 @@ package utils
 import (
 	"crypto/ecdsa"
 	"crypto/rand"
-	"crypto/sha256"
 	"fmt"
 	"github.com/dustinxie/ecc"
 )
@@ -16,6 +15,20 @@ import (
 
 func Byte2HexString(data []byte) string {
 	return fmt.Sprint(data)
+}
+
+/**
+ * RIPEMD160哈希摘要算法
+ * @param data
+ * @return
+ */
+
+func Ripemd160Digest(data []byte) []byte {
+	//ripemd160 := crypto.RIPEMD160.New()
+	//ripemd160.Write(data)
+	//hashBytes := ripemd160.Sum(nil)
+	//return hashBytes
+	return data
 }
 
 /**
@@ -42,8 +55,8 @@ func Secp256k1Generate() (*ecdsa.PrivateKey, ecdsa.PublicKey) {
 
 func Signature(data []byte, privateKey *ecdsa.PrivateKey) []byte {
 	// sign message
-	hash := sha256.Sum256(data)
-	sig, err := ecc.SignBytes(privateKey, hash[:], ecc.Normal)
+	//hash := sha256.Sum256(data)
+	sig, err := ecc.SignBytes(privateKey, data[:], ecc.Normal)
 	if err != nil {
 		panic("Signature Message Error...")
 	}
@@ -60,15 +73,4 @@ func Signature(data []byte, privateKey *ecdsa.PrivateKey) []byte {
 
 func Verify(data []byte, sign []byte, publicKey *ecdsa.PublicKey) bool {
 	return ecc.VerifyBytes(publicKey, data[:], sign, ecc.Normal)
-}
-
-/**
- * utxo数组（包含输入和输出）转化为byte数据供交易签名
- * @param inUtxos
- * @param outUtxos
- * @return
- */
-
-func UTXO2Bytes(inUTXO []UTXO, outUTXO []UTXO) []byte {
-	return []byte(fmt.Sprint(inUTXO) + fmt.Sprint(outUTXO))
 }

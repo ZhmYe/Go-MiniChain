@@ -37,6 +37,7 @@ func (m *MinerNode) Run() {
 			transactions := m.transactionPool.GetAll()
 			blockBody := m.GetBlockBody(transactions)
 			m.Mine(blockBody)
+			fmt.Println("The Sum of all amount: ", m.blockchain.GetAllAmount())
 		}
 	}
 }
@@ -107,4 +108,16 @@ func (m *MinerNode) GetBlock(blockBody data.BlockBody) *data.Block {
 	blockHeader := data.NewBlockHeader(preBlockHash, blockBody.GetMerkleRootHash(), nonce)
 	block := data.NewBlock(*blockHeader, blockBody)
 	return block
+}
+
+func (m *MinerNode) Check(transactions []data.Transaction) bool {
+	for _, transaction := range transactions {
+		data := data.UTXO2Bytes(transaction.GetInUTXOs(), transaction.GetOutUTXOs())
+		sign := transaction.GetSendSign()
+		publicKey := transaction.GetSendPublicKey()
+		if !utils.Verify(data, sign, &publicKey) {
+			return false
+		}
+	}
+	return true
 }
