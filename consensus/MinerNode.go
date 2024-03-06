@@ -5,7 +5,6 @@ import (
 	"Go-Minichain/data"
 	"Go-Minichain/utils"
 	"fmt"
-	"math/rand"
 	"strings"
 )
 
@@ -45,28 +44,7 @@ func (m *MinerNode) GetBlockBody(transactions []data.Transaction) data.BlockBody
 		panic("transactions can not be nil or be more than config.MaxTransactionCount")
 	}
 	// todo 这里计算merkle Root
-	hashs := make([]string, 0)
-	for _, transaction := range transactions {
-		txHash := utils.GetSha256Digest(transaction.ToString())
-		hashs = append(hashs, txHash)
-	}
-	for {
-		if len(hashs) == 1 {
-			break
-		}
-		nbHashs := len(hashs)
-		for i := 0; i < nbHashs; i += 2 {
-			leftNode := hashs[i]
-			rightNode := hashs[i+1]
-			hashs = append(hashs, utils.GetSha256Digest(leftNode+rightNode))
-		}
-		if nbHashs%2 == 1 {
-			node := hashs[nbHashs-1]
-			hashs = append(hashs, utils.GetSha256Digest(node+node))
-		}
-		hashs = hashs[nbHashs:]
-	}
-	return *data.NewBlockBody(hashs[0], transactions)
+	return *data.NewBlockBody("", []data.Transaction{})
 }
 
 /**
@@ -94,17 +72,10 @@ func (m *MinerNode) Mine(blockBody data.BlockBody) {
 			break
 		} else {
 			// todo
-			nonce := rand.Int63()
-			block.SetNonce(nonce)
 		}
 	}
 }
 func (m *MinerNode) GetBlock(blockBody data.BlockBody) *data.Block {
 	// todo
-	preBlock := m.blockchain.GetNewestBlock()
-	preBlockHash := utils.GetSha256Digest(preBlock.ToString())
-	nonce := rand.Int63()
-	blockHeader := data.NewBlockHeader(preBlockHash, blockBody.GetMerkleRootHash(), nonce)
-	block := data.NewBlock(*blockHeader, blockBody)
-	return block
+	return &data.Block{}
 }
