@@ -1,8 +1,9 @@
-package consensus
+package network
 
 import (
 	"Go-Minichain/config"
 	"Go-Minichain/data"
+	"Go-Minichain/spv"
 	"Go-Minichain/utils"
 	"fmt"
 	"math/rand"
@@ -23,21 +24,20 @@ import (
  */
 
 type MinerNode struct {
-	transactionPool *data.TransactionPool
-	blockchain      *data.BlockChain
+	network *NetWork
 }
 
-func NewMinerNode(pool *data.TransactionPool, chain *data.BlockChain) *MinerNode {
-	return &MinerNode{transactionPool: pool, blockchain: chain}
+func NewMinerNode(network *NetWork) *MinerNode {
+	return &MinerNode{network: network}
 }
 func (m *MinerNode) Run() {
-	m.transactionPool.Start()
+	//m.transactionPool.Start()
 	for {
-		if m.transactionPool.IsFull() {
-			transactions := m.transactionPool.GetAll()
+		if m.network.CheckTransactionIsFull() {
+			transactions := m.network.GetAllTransactions()
 			blockBody := m.GetBlockBody(transactions)
 			m.Mine(blockBody)
-			fmt.Println("The Sum of all amount: ", m.blockchain.GetAllAmount())
+			fmt.Println("The Sum of all amount: ", m.network.GetTotalAmount())
 		}
 	}
 }
@@ -87,11 +87,12 @@ func (m *MinerNode) Mine(blockBody data.BlockBody) {
 		blockHash := utils.GetSha256Digest(block.ToString())
 		if strings.HasPrefix(blockHash, utils.HashPrefixTarget()) {
 			header := block.GetBlockHeader()
-			fmt.Println("Mined a new Block! Previous Block Hash is: " + header.GetPreBlockHash())
+			fmt.Println("\nMined a new Block! Previous Block Hash is: " + header.GetPreBlockHash())
 			fmt.Println("And the hash of this Block is : " + utils.GetSha256Digest(block.ToString()) +
 				", you will see the hash value in next Block's preBlockHash field.")
 			fmt.Println()
-			m.blockchain.AddNewBlock(*block)
+			m.network.AddNewBlock(*block)
+			m.BroadCast(*block)
 			break
 		} else {
 			// todo
@@ -102,7 +103,7 @@ func (m *MinerNode) Mine(blockBody data.BlockBody) {
 }
 func (m *MinerNode) GetBlock(blockBody data.BlockBody) *data.Block {
 	// todo
-	preBlock := m.blockchain.GetNewestBlock()
+	preBlock := m.network.GetNewestBlock()
 	preBlockHash := utils.GetSha256Digest(preBlock.ToString())
 	nonce := rand.Int63()
 	blockHeader := data.NewBlockHeader(preBlockHash, blockBody.GetMerkleRootHash(), nonce)
@@ -120,4 +121,75 @@ func (m *MinerNode) Check(transactions []data.Transaction) bool {
 		}
 	}
 	return true
+}
+
+func (m *MinerNode) GetProof(txHash string) spv.Proof {
+	proofHeight := -1
+	flag := false
+	proofBlock := *new(data.Block)
+	for _, block := range m.network.GetBlocks() {
+		proofHeight++
+		blockBody := block.GetBlockBody()
+		for _, transacton := range blockBody.GetTransctions() {
+			hash := utils.GetSha256Digest(transacton.ToString())
+			if hash == txHash {
+				flag = true
+				proofBlock = block
+				break
+			}
+		}
+		if flag {
+			break
+		}
+	}
+	if !flag {
+		panic("No such transaction!!!")
+	}
+
+	// 重新计算Merkle树获得路径哈希值，同时记录相关节点偏向信息，构建验证路径节点
+	path := make([]spv.Node, 0)
+	hashList := make([]string, 0)
+	pathTxHash := txHash
+	blockBody := proofBlock.GetBlockBody()
+	for _, transaction := range blockBody.GetTransctions() {
+		hashList = append(hashList, utils.GetSha256Digest(transaction.ToString()))
+	}
+	for {
+		if len(hashList) == 1 {
+			break
+		}
+		newList := make([]string, 0)
+		for i := 0; i < len(hashList); i += 2 {
+			leftHash := hashList[i]
+			// 如果出现奇数个节点，就复制最后一个节点与自己成对
+			rightHash := ""
+			if i+1 < len(hashList) {
+				rightHash = hashList[i+1]
+			} else {
+				rightHash = leftHash
+			}
+			parentHash := utils.GetSha256Digest(leftHash + rightHash)
+			newList = append(newList, parentHash)
+			// 如果某一个哈希值与路径哈希相同，则将另一个作为验证路径中的节点加入，同时记录偏向，并更新路径哈希
+			if pathTxHash == leftHash {
+				proofNode := spv.NewNode(rightHash, spv.RIGHT)
+				path = append(path, *proofNode)
+				pathTxHash = parentHash
+			} else if pathTxHash == rightHash {
+				proofNode := spv.NewNode(leftHash, spv.LEFT)
+				path = append(path, *proofNode)
+				pathTxHash = parentHash
+			}
+		}
+		hashList = newList
+	}
+	ProofMerkleHash := hashList[0]
+	return *spv.NewProof(txHash, ProofMerkleHash, proofHeight, path)
+}
+func (m *MinerNode) BroadCast(block data.Block) {
+	spvPeers := m.network.GetSPVPeers()
+	for _, peer := range spvPeers {
+		peer.Accept(block.GetBlockHeader())
+	}
+	fmt.Println("All SPV Peer Accept Newest Block Header...")
 }

@@ -1,2 +1,2 @@
 # Go-MiniChain
-区块链实验课Minichain实验go语言版本
+### 实验三：SPV简单支付验证

@@ -1,6 +1,7 @@
-package data
+package network
 
 import (
+	"Go-Minichain/data"
 	"Go-Minichain/utils"
 	"crypto/elliptic"
 	"math/rand"
@@ -11,28 +12,28 @@ import (
  */
 
 type TransactionPool struct {
-	transactions []Transaction
+	transactions []data.Transaction
 	capacity     int
-	blockchain   *BlockChain
+	network      *NetWork
 }
 
-func NewTransactionPool(c int, chain *BlockChain) *TransactionPool {
+func NewTransactionPool(c int, network *NetWork) *TransactionPool {
 	p := new(TransactionPool)
 	p.capacity = c
-	p.transactions = make([]Transaction, 0)
-	p.blockchain = chain
+	p.transactions = make([]data.Transaction, 0)
+	p.network = network
 	return p
 }
-func (p *TransactionPool) Put(transaction Transaction) {
+func (p *TransactionPool) Put(transaction data.Transaction) {
 	p.transactions = append(p.transactions, transaction)
 }
-func (p *TransactionPool) GetAll() []Transaction {
+func (p *TransactionPool) GetAll() []data.Transaction {
 	transactions := p.transactions
 	p.clear()
 	return transactions
 }
 func (p *TransactionPool) clear() {
-	p.transactions = make([]Transaction, 0)
+	p.transactions = make([]data.Transaction, 0)
 }
 func (p *TransactionPool) IsFull() bool {
 	return len(p.transactions) >= p.capacity
@@ -43,9 +44,9 @@ func (p *TransactionPool) IsEmpty() bool {
 func (p *TransactionPool) GetCapacity() int {
 	return p.capacity
 }
-func (p *TransactionPool) GetNewTransaction() *Transaction {
-	accounts := p.blockchain.GetAccount()
-	var transaction *Transaction
+func (p *TransactionPool) GetNewTransaction() *data.Transaction {
+	accounts := p.network.GetAccounts()
+	var transaction *data.Transaction
 	for {
 		// 随机获取两个账户A和B
 		aAccount := accounts[rand.Intn(len(accounts))]
@@ -58,7 +59,7 @@ func (p *TransactionPool) GetNewTransaction() *Transaction {
 		aWalletAddress := aAccount.GetWalletAddress()
 		bWalletAddress := bAccount.GetWalletAddress()
 		// 获取A可用的Utxo并计算余额
-		aTrueUtxos := p.blockchain.GetTrueUTXOs(aWalletAddress)
+		aTrueUtxos := p.network.GetTrueUTXOs(aWalletAddress)
 		aAmount := aAccount.GetAmount(aTrueUtxos)
 		// 如果A账户的余额为0，则无法构建交易，重新随机生成
 		if aAmount == 0 {
@@ -66,8 +67,8 @@ func (p *TransactionPool) GetNewTransaction() *Transaction {
 		}
 		// 随机生成交易数额 [1, aAmount] 之间
 		txAmount := rand.Intn(aAmount) + 1
-		inUTXOs := make([]*UTXO, 0)
-		outUTXOs := make([]*UTXO, 0)
+		inUTXOs := make([]*data.UTXO, 0)
+		outUTXOs := make([]*data.UTXO, 0)
 		// A账户需先解锁才能使用自己的utxo，解锁需要私钥签名和公钥去执行解锁脚本，这里先生成需要解锁的签名
 		// 签名的数据我们约定为公钥的二进制数据
 		publickKey := aAccount.GetPublicKey()
@@ -91,20 +92,19 @@ func (p *TransactionPool) GetNewTransaction() *Transaction {
 			continue
 		}
 		// 构建输出OutUtxos，A账户向B账户支付txAmount，同时输入对方的公钥以供生成公钥哈希
-		outUTXOs = append(outUTXOs, NewUTXO(bWalletAddress, txAmount, bAccount.GetPublicKey()))
+		outUTXOs = append(outUTXOs, data.NewUTXO(bWalletAddress, txAmount, bAccount.GetPublicKey()))
 		// 如果有余额，则“找零”，即给自己的utxo
 		if inAmount > txAmount {
-			outUTXOs = append(outUTXOs, NewUTXO(aWalletAddress, inAmount-txAmount, aAccount.GetPublicKey()))
+			outUTXOs = append(outUTXOs, data.NewUTXO(aWalletAddress, inAmount-txAmount, aAccount.GetPublicKey()))
 		}
 		// A账户需对整个交易进行私钥签名，确保交易不会被篡改，因为交易会传输到网络中，而上述步骤可在本地离线环境中构造
 		// 获取要签名的数据: inUtxos & outUtxos
-		data := UTXO2Bytes(inUTXOs, outUTXOs)
 		// A账户使用私钥签名
-		sign := utils.Signature(data, aAccount.GetPrivateKey())
+		sign := utils.Signature(data.UTXO2Bytes(inUTXOs, outUTXOs), aAccount.GetPrivateKey())
 		//timeStamp := time.Now().Nanosecond()
-		transaction = NewTransaction(inUTXOs, outUTXOs, sign, aAccount.GetPublicKey())
+		transaction = data.NewTransaction(inUTXOs, outUTXOs, sign, aAccount.GetPublicKey())
 		// 这里还需要将outUXTO添加,并将inUTXO置为已使用
-		p.blockchain.ProcessTransactionUTXO(inUTXOs, outUTXOs)
+		p.network.ProcessTransactionUTXO(inUTXOs, outUTXOs)
 		break
 	}
 	return transaction
